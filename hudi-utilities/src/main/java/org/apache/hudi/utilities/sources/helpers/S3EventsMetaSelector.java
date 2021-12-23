@@ -124,6 +124,7 @@ public class S3EventsMetaSelector extends CloudObjectsSelector {
       } else {
         log.debug(String.format("Message is not expected format or it's s3:TestEvent. Message: %s", message));
       }
+      System.out.println("valid message added = " + message);
       processedMessages.add(message);
     }
     return validEvents;
@@ -144,6 +145,7 @@ public class S3EventsMetaSelector extends CloudObjectsSelector {
       log.info("Start Checkpoint : " + lastCheckpointStr);
       List<Map<String, Object>> eventRecords = getValidEvents(sqs, processedMessages);
       log.info("Number of valid events: " + eventRecords.size());
+      System.out.println("Number of valid events in getNextEventsFromQueue = " + eventRecords.size());
       List<String> filteredEventRecords = new ArrayList<>();
       long newCheckpointTime = eventRecords.stream()
           .mapToLong(eventRecord -> Date.from(Instant.from(

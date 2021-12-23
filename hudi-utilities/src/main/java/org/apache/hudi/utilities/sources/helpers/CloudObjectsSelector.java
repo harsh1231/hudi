@@ -156,7 +156,9 @@ public class CloudObjectsSelector {
          i < (int) Math.ceil((double) numMessagesToProcess / maxMessagesPerRequest);
          ++i) {
       List<Message> messages = sqsClient.receiveMessage(receiveMessageRequest).getMessages();
-      log.debug("Number of messages: " + messages.size());
+      log.debug("Number of messages: in iteration = " + i + " total size " +  messages.size());
+      System.out.println("total number of messages " +  messages.size());
+      messages.forEach(x -> System.out.println("messageId = " + x.getMessageId() + "\n" + x));
       messagesToProcess.addAll(messages);
       if (messages.isEmpty()) {
         // ApproximateNumberOfMessages value is eventually consistent.
@@ -164,6 +166,7 @@ public class CloudObjectsSelector {
         break;
       }
     }
+    System.out.println("total messages sent from getMessagesToProcess = " + messagesToProcess.size());
     return messagesToProcess;
   }
 
