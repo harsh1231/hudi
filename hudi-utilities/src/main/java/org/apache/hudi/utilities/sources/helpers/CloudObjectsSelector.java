@@ -37,6 +37,7 @@ import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -151,6 +152,10 @@ public class CloudObjectsSelector {
     Map<String, String> queueAttributesResult = getSqsQueueAttributes(sqsClient, queueUrl);
     long approxMessagesAvailable = Long.parseLong(queueAttributesResult.get(SQS_ATTR_APPROX_MESSAGES));
     log.info("Approximately " + approxMessagesAvailable + " messages available in queue.");
+    long yourmilliseconds = System.currentTimeMillis();
+    SimpleDateFormat sdf = new SimpleDateFormat("MMM dd,yyyy HH:mm");
+    Date resultdate = new Date(yourmilliseconds);
+    System.out.println("time:" + sdf.format(resultdate) + " Approximately "  + approxMessagesAvailable + " messages available in queue.");
     long numMessagesToProcess = Math.min(approxMessagesAvailable, maxMessagePerBatch);
     for (int i = 0;
          i < (int) Math.ceil((double) numMessagesToProcess / maxMessagesPerRequest);
@@ -224,13 +229,13 @@ public class CloudObjectsSelector {
    * Delete Queue Messages after hudi commit. This method will be invoked by source.onCommit.
    */
   public void deleteProcessedMessages(AmazonSQS sqs, String queueUrl, List<Message> processedMessages) {
-    if (!processedMessages.isEmpty()) {
-      // create batch for deletion, SES DeleteMessageBatchRequest only accept max 10 entries
-      List<List<Message>> deleteBatches = createListPartitions(processedMessages, 10);
-      for (List<Message> deleteBatch : deleteBatches) {
-        deleteBatchOfMessages(sqs, queueUrl, deleteBatch);
-      }
-    }
+  //    if (!processedMessages.isEmpty()) {
+  //      // create batch for deletion, SES DeleteMessageBatchRequest only accept max 10 entries
+  //      List<List<Message>> deleteBatches = createListPartitions(processedMessages, 10);
+  //      for (List<Message> deleteBatch : deleteBatches) {
+  //        deleteBatchOfMessages(sqs, queueUrl, deleteBatch);
+  //      }
+  //    }
   }
 
   /**
