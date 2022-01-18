@@ -62,25 +62,25 @@ public abstract class BaseRollbackActionExecutor<T extends HoodieRecordPayload, 
   private final boolean skipLocking;
 
   public BaseRollbackActionExecutor(HoodieEngineContext context,
-      HoodieWriteConfig config,
-      HoodieTable<T, I, K, O> table,
-      String instantTime,
-      HoodieInstant instantToRollback,
-      boolean deleteInstants,
-      boolean skipLocking) {
+                                    HoodieWriteConfig config,
+                                    HoodieTable<T, I, K, O> table,
+                                    String instantTime,
+                                    HoodieInstant instantToRollback,
+                                    boolean deleteInstants,
+                                    boolean skipLocking) {
     this(context, config, table, instantTime, instantToRollback, deleteInstants,
         false, config.shouldRollbackUsingMarkers(), skipLocking);
   }
 
   public BaseRollbackActionExecutor(HoodieEngineContext context,
-      HoodieWriteConfig config,
-      HoodieTable<T, I, K, O> table,
-      String instantTime,
-      HoodieInstant instantToRollback,
-      boolean deleteInstants,
-      boolean skipTimelinePublish,
-      boolean useMarkerBasedStrategy,
-      boolean skipLocking) {
+                                    HoodieWriteConfig config,
+                                    HoodieTable<T, I, K, O> table,
+                                    String instantTime,
+                                    HoodieInstant instantToRollback,
+                                    boolean deleteInstants,
+                                    boolean skipTimelinePublish,
+                                    boolean useMarkerBasedStrategy,
+                                    boolean skipLocking) {
     super(context, config, table, instantTime);
     this.instantToRollback = instantToRollback;
     this.deleteInstants = deleteInstants;
@@ -105,62 +105,45 @@ public abstract class BaseRollbackActionExecutor<T extends HoodieRecordPayload, 
   private HoodieRollbackMetadata runRollback(HoodieTable<T, I, K, O> table, HoodieInstant rollbackInstant, HoodieRollbackPlan rollbackPlan) {
     ValidationUtils.checkArgument(rollbackInstant.getState().equals(HoodieInstant.State.REQUESTED)
         || rollbackInstant.getState().equals(HoodieInstant.State.INFLIGHT));
-    try {
-      final HoodieInstant inflightInstant;
-      final HoodieTimer timer = new HoodieTimer();
-      timer.startTimer();
-      if (rollbackInstant.isRequested()) {
-        inflightInstant = table.getActiveTimeline().transitionRollbackRequestedToInflight(rollbackInstant,
-            TimelineMetadataUtils.serializeRollbackPlan(rollbackPlan));
-      } else {
-        inflightInstant = rollbackInstant;
-      }
+    final HoodieTimer timer = new HoodieTimer();
+    timer.startTimer();
+    final HoodieInstant inflightInstant = rollbackInstant.isRequested()
+        ? table.getActiveTimeline().transitionRollbackRequestedToInflight(rollbackInstant)
+        : rollbackInstant;
 
-      HoodieTimer rollbackTimer = new HoodieTimer().startTimer();
-      List<HoodieRollbackStat> stats = doRollbackAndGetStats(rollbackPlan);
-      HoodieRollbackMetadata rollbackMetadata = TimelineMetadataUtils.convertRollbackMetadata(
-          instantTime,
-          Option.of(rollbackTimer.endTimer()),
-          Collections.singletonList(instantToRollback),
-          stats);
-      if (!skipTimelinePublish) {
-        finishRollback(inflightInstant, rollbackMetadata);
-      }
-
-      // Finally, remove the markers post rollback.
-      WriteMarkersFactory.get(config.getMarkersType(), table, instantToRollback.getTimestamp())
-          .quietDeleteMarkerDir(context, config.getMarkersDeleteParallelism());
-
-      return rollbackMetadata;
-    } catch (IOException e) {
-      throw new HoodieIOException("Failed to rollback commit ", e);
+    HoodieTimer rollbackTimer = new HoodieTimer().startTimer();
+    List<HoodieRollbackStat> stats = doRollbackAndGetStats(rollbackPlan);
+    HoodieRollbackMetadata rollbackMetadata = TimelineMetadataUtils.convertRollbackMetadata(
+        instantTime,
+        Option.of(rollbackTimer.endTimer()),
+        Collections.singletonList(instantToRollback),
+        stats);
+    if (!skipTimelinePublish) {
+      finishRollback(inflightInstant, rollbackMetadata);
     }
+
+    // Finally, remove the markers post rollback.
+    WriteMarkersFactory.get(config.getMarkersType(), table, instantToRollback.getTimestamp())
+        .quietDeleteMarkerDir(context, config.getMarkersDeleteParallelism());
+
+    return rollbackMetadata;
   }
 
   @Override
   public HoodieRollbackMetadata execute() {
     table.getMetaClient().reloadActiveTimeline();
-    List<HoodieInstant> rollBackInstants = table.getRollbackTimeline()
-        .filterInflightsAndRequested().getInstants().collect(Collectors.toList());
-    if (rollBackInstants.isEmpty()) {
-      throw new HoodieRollbackException("No Requested Rollback Instants found to execute rollback ");
+    Option<HoodieInstant> rollbackInstant = table.getRollbackTimeline()
+        .filterInflightsAndRequested()
+        .filter(instant -> instant.getTimestamp().equals(instantTime))
+        .firstInstant();
+    if (!rollbackInstant.isPresent()) {
+      throw new HoodieRollbackException("No pending rollback instants found to execute rollback");
     }
-    HoodieInstant rollbackInstant = null;
-    for (HoodieInstant instant : rollBackInstants) {
-      if (instantTime.equals(instant.getTimestamp())) {
-        rollbackInstant = instant;
-        break;
-      }
-    }
-    if (rollbackInstant != null) {
-      try {
-        HoodieRollbackPlan rollbackPlan = RollbackUtils.getRollbackPlan(table.getMetaClient(), rollbackInstant);
-        return runRollback(table, rollBackInstants.get(0), rollbackPlan);
-      } catch (IOException e) {
-        throw new HoodieIOException("Failed to fetch rollback plan to rollback commit " + rollbackInstant.getTimestamp(), e);
-      }
-    } else {
-      throw new HoodieIOException("No inflight rollback instants found for commit time " + instantTime);
+    try {
+      HoodieRollbackPlan rollbackPlan = RollbackUtils.getRollbackPlan(table.getMetaClient(), rollbackInstant.get());
+      return runRollback(table, rollbackInstant.get(), rollbackPlan);
+    } catch (IOException e) {
+      throw new HoodieIOException("Failed to fetch rollback plan for commit " + instantTime, e);
     }
   }
 
@@ -279,8 +262,8 @@ public abstract class BaseRollbackActionExecutor<T extends HoodieRecordPayload, 
    * @param instantToBeDeleted Instant to be deleted
    */
   protected void deleteInflightAndRequestedInstant(boolean deleteInstant,
-      HoodieActiveTimeline activeTimeline,
-      HoodieInstant instantToBeDeleted) {
+                                                   HoodieActiveTimeline activeTimeline,
+                                                   HoodieInstant instantToBeDeleted) {
     // Remove the rolled back inflight commits
     if (deleteInstant) {
       LOG.info("Deleting instant=" + instantToBeDeleted);

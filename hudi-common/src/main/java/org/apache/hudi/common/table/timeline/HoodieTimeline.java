@@ -126,14 +126,14 @@ public interface HoodieTimeline extends Serializable {
    * view is constructed with this timeline so that file-slice after pending compaction-requested instant-time is also
    * considered valid. A RT file-system view for reading must then merge the file-slices before and after pending
    * compaction instant so that all delta-commits are read.
-   * 
+   *
    * @return New instance of HoodieTimeline with just completed instants
    */
   HoodieTimeline filterCompletedAndCompactionInstants();
 
   /**
    * Timeline to just include commits (commit/deltacommit), compaction and replace actions.
-   * 
+   *
    * @return
    */
   HoodieTimeline getWriteTimeline();
@@ -147,7 +147,7 @@ public interface HoodieTimeline extends Serializable {
 
   /**
    * Filter this timeline to just include requested and inflight compaction instants.
-   * 
+   *
    * @return
    */
   HoodieTimeline filterPendingCompactionTimeline();
@@ -191,7 +191,7 @@ public interface HoodieTimeline extends Serializable {
    * Create new timeline with all instants before or equals specified time.
    */
   HoodieTimeline findInstantsBeforeOrEquals(String instantTime);
-  
+
   /**
    * Custom Filter of Instants.
    */
@@ -234,7 +234,7 @@ public interface HoodieTimeline extends Serializable {
 
   /**
    * Get hash of timeline.
-   * 
+   *
    * @return
    */
   String getTimelineHash();
@@ -281,6 +281,8 @@ public interface HoodieTimeline extends Serializable {
    */
   Option<byte[]> getInstantDetails(HoodieInstant instant);
 
+  boolean isEmpty(HoodieInstant instant);
+
   /**
    * Helper methods to compare instants.
    **/
@@ -299,7 +301,7 @@ public interface HoodieTimeline extends Serializable {
    */
   static boolean isInRange(String timestamp, String startTs, String endTs) {
     return HoodieTimeline.compareTimestamps(timestamp, GREATER_THAN, startTs)
-            && HoodieTimeline.compareTimestamps(timestamp, LESSER_THAN_OR_EQUALS, endTs);
+        && HoodieTimeline.compareTimestamps(timestamp, LESSER_THAN_OR_EQUALS, endTs);
   }
 
   static HoodieInstant getCompletedInstant(final HoodieInstant instant) {
